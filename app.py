@@ -3,6 +3,7 @@ import time
 from datetime import datetime
 from typing import Any, Dict
 import httpx
+import uvicorn
 from mcp.server.fastmcp import FastMCP
 
 # Variables de entorno
@@ -31,7 +32,7 @@ async def obtener_token_valido() -> str:
         response.raise_for_status()
         token = response.json().get("token")
         token_cache["token"] = token
-        token_cache["expires_at"] = ahora + 3300 # Expiración en 55 mins
+        token_cache["expires_at"] = ahora + 3300 # 55 mins
         return token
 
 def normalizar_a_epoch(fecha_str: str) -> int:
@@ -98,7 +99,6 @@ async def ejecutar_accion_maquina(product_id: int, machine_id: int, cloud: int =
             json={"product_id": product_id, "machine_id": machine_id, "cloud": cloud},
             headers={"Authorization": f"Bearer {token}"}
         )
-        # Gestionar errores controlados de la API (ej. 406 Not Possible)
         if res.status_code != 200:
             return {"error": True, "status": res.status_code, "detalle": res.text}
         return res.json()
@@ -191,5 +191,9 @@ async def eliminar_tarjeta(number_id: str) -> Dict[str, Any]:
         return res.json()
 
 
-# Exposición de la aplicación ASGI/FastAPI para transporte SSE
+# Exposición de la aplicación FastAPI
 app = mcp.sse_app()
+
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 10000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
