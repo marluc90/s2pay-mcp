@@ -39,9 +39,9 @@ def obtener_token() -> str:
     return token
 
 
-def normalizar_a_epoch(fecha_str: str) -> int:
-    """Convierte cadenas de fecha (YYYY-MM-DD) o timestamps a Unix Epoch."""
-    if not fecha_str or str(fecha_str) == "0":
+def normalizar_a_epoch(fecha_str: str | None) -> int:
+    """Convierte cadenas de fecha (YYYY-MM-DD), timestamps o None a Unix Epoch."""
+    if not fecha_str or str(fecha_str).strip() in ("0", ""):
         return 0
     if str(fecha_str).isdigit():
         return int(fecha_str)
@@ -56,7 +56,7 @@ def normalizar_a_epoch(fecha_str: str) -> int:
         dt = datetime.fromisoformat(fecha_str)
         return int(dt.timestamp())
     except ValueError:
-        raise ValueError(f"Formato de fecha no válido: '{fecha_str}'. Usa 'YYYY-MM-DD' o Epoch.")
+        raise ValueError(f"Formato de fecha no válido: '{fecha_str}'. Usa 'YYYY-MM-DD'.")
 
 
 def call_kioskera(method: str, endpoint: str, **kwargs) -> dict | list:
@@ -100,7 +100,11 @@ def listar_maquinas() -> dict | list:
 
 @mcp.tool()
 def estado_maquina(machine_id: int) -> dict | list:
-    """Consulta el estado técnico (powerOn, standby, outService) de una máquina por su ID."""
+    """
+    Consulta el estado técnico (powerOn, standby, outService) de una máquina por su ID.
+    
+    machine_id: ID numérico único de la máquina.
+    """
     return call_kioskera("GET", "/api/machine/status/get", params={"id": machine_id})
 
 
@@ -108,13 +112,23 @@ def estado_maquina(machine_id: int) -> dict | list:
 
 @mcp.tool()
 def productos_maquina(machine_id: int) -> dict | list:
-    """Obtiene los programas y servicios configurados para una máquina concreta."""
+    """
+    Obtiene los programas y servicios configurados para una máquina concreta.
+    
+    machine_id: ID numérico único de la máquina.
+    """
     return call_kioskera("GET", "/api/products/machine/get", params={"id": machine_id})
 
 
 @mcp.tool()
 def ejecutar_accion_maquina(product_id: int, machine_id: int, cloud: int = 1) -> dict | list:
-    """Activa o ejecuta un producto/servicio en la lavadora o secadora objetivo."""
+    """
+    Activa o ejecuta un producto/servicio en la lavadora o secadora objetivo.
+    
+    product_id: ID numérico del producto a ejecutar.
+    machine_id: ID numérico de la máquina donde ejecutar el producto.
+    cloud: Indicador de ejecución remota (por defecto 1).
+    """
     payload = {"product_id": product_id, "machine_id": machine_id, "cloud": cloud}
     return call_kioskera("POST", "/api/products/execute/postAction", json=payload)
 
@@ -123,9 +137,21 @@ def ejecutar_accion_maquina(product_id: int, machine_id: int, cloud: int = 1) ->
 
 @mcp.tool()
 def buscar_facturacion(
-    machine_id: int, fecha_inicio: str, fecha_fin: str, limit: int = 100, offset: int = 0
+    machine_id: int,
+    fecha_inicio: str,
+    fecha_fin: str,
+    limit: int = 100,
+    offset: int = 0
 ) -> dict | list:
-    """Busca transacciones y facturación de una máquina entre dos fechas (YYYY-MM-DD o Epoch)."""
+    """
+    Busca transacciones y facturación de una máquina entre dos fechas.
+    
+    machine_id: ID numérico de la máquina a consultar.
+    fecha_inicio: Fecha inicial del rango en formato 'YYYY-MM-DD'.
+    fecha_fin: Fecha final del rango en formato 'YYYY-MM-DD'.
+    limit: Cantidad máxima de registros a devolver (por defecto 100).
+    offset: Número de registros a omitir para paginación (por defecto 0).
+    """
     params = {
         "machine_id": machine_id,
         "start_date": normalizar_a_epoch(fecha_inicio),
@@ -140,9 +166,19 @@ def buscar_facturacion(
 
 @mcp.tool()
 def crear_tarjeta(
-    number_id: str, balance: int, begin_date: str = "0", end_date: str = "0"
+    number_id: str,
+    balance: int,
+    begin_date: str | None = None,
+    end_date: str | None = None
 ) -> dict | list:
-    """Crea una tarjeta prepago nueva con saldo inicial en céntimos. Usa '0' en fechas para sin caducidad."""
+    """
+    Crea una tarjeta prepago nueva con un saldo inicial en céntimos.
+    
+    number_id: Identificador o número único asignado a la tarjeta.
+    balance: Saldo inicial expresado en céntimos (ejemplo: 1000 equivale a 10.00€).
+    begin_date: Opcional. Fecha de inicio de validez en formato 'YYYY-MM-DD'.
+    end_date: Opcional. Fecha de caducidad en formato 'YYYY-MM-DD'.
+    """
     payload = {
         "number_id": number_id,
         "balance": balance,
@@ -154,15 +190,27 @@ def crear_tarjeta(
 
 @mcp.tool()
 def obtener_info_tarjeta(number_id: str) -> dict | list:
-    """Obtiene el estado, saldo y detalles de una única tarjeta prepago por su number_id."""
+    """
+    Obtiene el estado, saldo y detalles de una única tarjeta prepago.
+    
+    number_id: Identificador o número único de la tarjeta a consultar.
+    """
     return call_kioskera("GET", "/api/card/getcard", params={"number_id": number_id})
 
 
 @mcp.tool()
 def listar_tarjetas(
-    limit: int = 10, begin_date: str = "0", end_date: str = "0"
+    limit: int = 10,
+    begin_date: str | None = None,
+    end_date: str | None = None
 ) -> dict | list:
-    """Lista de manera paginada las tarjetas prepago registradas en la empresa."""
+    """
+    Lista de manera paginada las tarjetas prepago registradas en la empresa.
+    
+    limit: Número máximo de tarjetas a recuperar (por defecto 10).
+    begin_date: Opcional. Filtrar tarjetas válidas desde la fecha 'YYYY-MM-DD'.
+    end_date: Opcional. Filtrar tarjetas válidas hasta la fecha 'YYYY-MM-DD'.
+    """
     params = {
         "limit": limit,
         "begin_date": normalizar_a_epoch(begin_date),
@@ -173,7 +221,11 @@ def listar_tarjetas(
 
 @mcp.tool()
 def eliminar_tarjeta(number_id: str) -> dict | list:
-    """Elimina permanentemente una tarjeta prepago dada su identificación."""
+    """
+    Elimina permanentemente una tarjeta prepago dada su identificación.
+    
+    number_id: Identificador o número único de la tarjeta a eliminar.
+    """
     return call_kioskera("DELETE", f"/api/card/delete/{number_id}")
 
 
