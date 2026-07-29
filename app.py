@@ -21,42 +21,22 @@ _TOKEN_CACHE = {"token": None, "expires_at": 0}
 
 
 def obtener_token() -> str:
-    """Obtiene o renueva el token Bearer probando posibles variantes de URL."""
+    """Obtiene o renueva el token Bearer para la API de Kioskera."""
     ahora = time.time()
     if _TOKEN_CACHE["token"] and _TOKEN_CACHE["expires_at"] > ahora:
         return _TOKEN_CACHE["token"]
 
-    base_limpia = BASE_URL.rstrip('/')
-    
-    # Lista de variantes habituales según la configuración en Postman
-    rutas_a_probar = [
-        f"{base_limpia}/api/login",
-        f"{base_limpia}/login",
-        f"{base_limpia}/api/user/login",
-        # Variante HTTP si la base contenía HTTPS en puerto 16980
-        base_limpia.replace("https://", "http://") + "/api/login",
-        base_limpia.replace("https://", "http://") + "/login",
-    ]
-
+    url = f"{BASE_URL.rstrip('/')}/api/login"
     payload = {"email": KIOSKERA_EMAIL, "password": KIOSKERA_PASSWORD}
 
-    for url in rutas_a_probar:
-        try:
-            response = requests.post(url, json=payload, timeout=5)
-            if response.status_code == 200:
-                data = response.json()
-                token = data.get("token")
-                if token:
-                    print(f"--> [OK] Autenticación correcta usando la URL: {url}")
-                    _TOKEN_CACHE["token"] = token
-                    _TOKEN_CACHE["expires_at"] = ahora + 3300
-                    return token
-        except Exception:
-            continue
+    response = requests.post(url, json=payload, timeout=10)
+    response.raise_for_status()
+    data = response.json()
 
-    raise RuntimeError(
-        f"No se pudo autenticar en Kioskera. Revisa las credenciales o la BASE_URL ({BASE_URL})."
-    )
+    token = data.get("token")
+    _TOKEN_CACHE["token"] = token
+    _TOKEN_CACHE["expires_at"] = ahora + 3300  # Válido ~55 minutos
+    return token
 
 
 def normalizar_a_epoch(fecha_str: str | None) -> int:
